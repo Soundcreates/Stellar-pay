@@ -48,12 +48,16 @@ export default function App() {
   }, [profile]);
 
   async function connect() {
-    if (!await isConnected()) return setNotice('Install Freighter to sign Stellar testnet payments.');
-    const { address, error } = await requestAccess();
-    if (error) return setNotice(error);
-    const user = await fetch(`${API}/users/address/${address}`).then((r) => r.json());
-    if (user) setProfile(user);
-    else { setProfile({ address }); setSetup(true); }
+    try {
+      if (!await isConnected()) return setNotice('Install Freighter to sign Stellar testnet payments.');
+      const { address, error } = await requestAccess();
+      if (error) return setNotice(error);
+      const user = await fetch(`${API}/users/address/${address}`).then((r) => r.json());
+      if (user) setProfile(user);
+      else { setProfile({ address }); setSetup(true); }
+    } catch {
+      setNotice('Unable to reach the backend. Check that ngrok and port 3100 are running.');
+    }
   }
 
   async function claimUsername(event) {
