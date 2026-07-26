@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { isConnected, requestAccess, signTransaction } from '@stellar/freighter-api';
 import { io } from 'socket.io-client';
 
-const API = import.meta.env.VITE_API_URL || 'https://kisha-volcanologic-motherly.ngrok-free.dev';
+const API = 'https://stellar-splitwise.onrender.com';
 
 export default function App() {
   const socket = useRef();
@@ -56,7 +56,7 @@ export default function App() {
       if (user) setProfile(user);
       else { setProfile({ address }); setSetup(true); }
     } catch {
-      setNotice('Unable to reach the backend. Check that ngrok and port 3100 are running.');
+      setNotice('Unable to reach the backend. Check that the Render service is running.');
     }
   }
 
