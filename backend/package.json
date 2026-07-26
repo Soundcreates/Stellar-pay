@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "node index.js",
     "start": "node index.js",
-    "check": "node --check index.js"
+    "check": "node --check index.js",
+    "test": "node --test db.test.mjs"
   },
   "dependencies": {
     "@fastify/cors": "^11.0.1",

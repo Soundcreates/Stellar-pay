@@ -1,6 +1,7 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { Server as SocketServer } from 'socket.io';
+import { createStore } from './db.js';
 import {
   Account,
   Asset,
@@ -15,6 +16,7 @@ const app = Fastify({ logger: true });
 const webOrigin = process.env.WEB_ORIGIN || 'http://localhost:5173';
 const io = new SocketServer(app.server, { cors: { origin: webOrigin } });
 const horizon = new Horizon.Server(process.env.STELLAR_HORIZON_URL || 'https://horizon-testnet.stellar.org');
+const store = createStore();
 const messages = new Map();
 const requests = new Map();
 
@@ -31,11 +33,46 @@ function stroops(amount) {
   return value;
 }
 
+function username(value) {
+  const name = requireText(value, 'username').replace(/^@/, '').toLowerCase();
+  if (!/^[a-z0-9_]{3,20}$/.test(name)) throw new Error('username must be 3–20 letters, numbers, or underscores');
+  return name;
+}
+
 function send(chatId, event, data) {
   io.to(chatId).emit(event, data);
 }
 
 app.get('/health', () => ({ ok: true, network: 'testnet' }));
+
+app.get('/users/address/:address', async (request) => store.userByAddress(request.params.address));
+
+app.get('/users/lookup/:username', async (request) => store.userByUsername(username(request.params.username)));
+
+app.post('/users', async (request, reply) => {
+  try {
+    const address = requireText(request.body?.address, 'address');
+    if (store.userByAddress(address)) return reply.code(409).send({ error: 'this wallet already has a username' });
+    const name = username(request.body?.username);
+    if (store.userByUsername(name)) return reply.code(409).send({ error: 'username is already taken' });
+    return store.createUser(address, name);
+  } catch (error) {
+    return reply.code(400).send({ error: error.message });
+  }
+});
+
+app.post('/chats/direct', async (request, reply) => {
+  try {
+    const address = requireText(request.body?.address, 'address');
+    if (!store.userByAddress(address)) return reply.code(403).send({ error: 'create a username before starting chats' });
+    const peer = store.userByUsername(username(request.body?.username));
+    if (!peer) return reply.code(404).send({ error: 'username not found' });
+    if (peer.address === address) return reply.code(400).send({ error: 'you cannot message yourself' });
+    return { ...store.directChat(address, peer.address), peer };
+  } catch (error) {
+    return reply.code(400).send({ error: error.message });
+  }
+});
 
 app.get('/chats/:chatId/messages', async (request) => messages.get(request.params.chatId) || []);
 
@@ -61,11 +98,17 @@ app.post('/messages', async (request, reply) => {
 
 app.post('/requests', async (request, reply) => {
   try {
+    const chatId = requireText(request.body?.chatId, 'chatId');
+    const payer = store.userByUsername(username(request.body?.payerUsername));
+    if (!payer) return reply.code(404).send({ error: 'payer username not found' });
+    const payee = requireText(request.body?.payee, 'payee');
+    if (!store.chatHasMembers(chatId, payer.address, payee)) return reply.code(403).send({ error: 'payments are limited to people in this chat' });
     const payment = {
       id: crypto.randomUUID(),
-      chatId: requireText(request.body?.chatId, 'chatId'),
-      payer: requireText(request.body?.payer, 'payer'),
-      payee: requireText(request.body?.payee, 'payee'),
+      chatId,
+      payer: payer.address,
+      payerUsername: payer.username,
+      payee,
       amount: stroops(request.body?.amount),
       status: 'open',
       type: 'request',
@@ -83,7 +126,9 @@ app.post('/payments/build', async (request, reply) => {
   try {
     const sender = requireText(request.body?.sender, 'sender');
     const destination = requireText(request.body?.destination, 'destination');
+    const chatId = requireText(request.body?.chatId, 'chatId');
     const amount = stroops(request.body?.amount);
+    if (!store.chatHasMembers(chatId, sender, destination)) return reply.code(403).send({ error: 'payments are limited to people in this chat' });
     const account = await horizon.loadAccount(sender);
     const tx = new TransactionBuilder(new Account(account.accountId(), account.sequenceNumber()), {
       fee: BASE_FEE,
