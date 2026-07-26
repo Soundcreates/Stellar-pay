@@ -94,6 +94,7 @@ app.post('/chats/group', async (request, reply) => {
 });
 
 app.get('/chats/:chatId/messages', async (request) => messages.get(request.params.chatId) || []);
+app.get('/chats/:chatId/requests', async (request) => [...requests.values()].filter((payment) => payment.chatId === request.params.chatId));
 
 app.post('/messages', async (request, reply) => {
   try {
@@ -133,7 +134,6 @@ app.post('/requests', async (request, reply) => {
       type: 'request',
     };
     requests.set(payment.id, payment);
-    send(payment.chatId, 'payment:request', payment);
     return payment;
   } catch (error) {
     return reply.code(400).send({ error: error.message });
@@ -167,7 +167,6 @@ app.post('/payments/submit', async (request, reply) => {
     const tx = TransactionBuilder.fromXDR(requireText(request.body?.signedXdr, 'signedXdr'), Networks.TESTNET);
     const result = await horizon.submitTransaction(tx);
     const payment = { hash: result.hash, successful: result.successful };
-    if (request.body?.chatId) send(request.body.chatId, 'payment:confirmed', payment);
     return payment;
   } catch (error) {
     return reply.code(400).send({ error: error.response?.data?.extras?.result_codes || error.message });

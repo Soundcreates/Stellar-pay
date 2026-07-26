@@ -24,8 +24,6 @@ export default function App() {
   useEffect(() => {
     socket.current = io(API, { transports: ['websocket'], reconnectionAttempts: 3 });
     socket.current.on('message:new', (message) => setMessages((all) => [...all, message]));
-    socket.current.on('payment:request', (payment) => setRequests((all) => [...all, payment]));
-    socket.current.on('payment:confirmed', ({ hash }) => setNotice(`Confirmed: ${hash.slice(0, 10)}…`));
     return () => socket.current.close();
   }, []);
 
@@ -35,6 +33,7 @@ export default function App() {
     if (!chat) return;
     socket.current?.emit('chat:join', chat.id);
     fetch(`${API}/chats/${chat.id}/messages`).then((r) => r.json()).then(setMessages).catch(() => {});
+    fetch(`${API}/chats/${chat.id}/requests`).then((r) => r.json()).then(setRequests).catch(() => {});
   }, [chat]);
 
   useEffect(() => {
@@ -105,6 +104,7 @@ export default function App() {
     if (signed.error) throw new Error(signed.error);
     const result = await fetch(`${API}/payments/submit`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ signedXdr: signed.signedTxXdr, chatId: chat.id }) }).then((r) => r.json());
     if (result.error) throw new Error(JSON.stringify(result.error));
+    setNotice(`Confirmed: ${result.hash.slice(0, 10)}…`);
   }
 
   async function directPay(event) {
@@ -117,6 +117,7 @@ export default function App() {
     const response = await fetch(`${API}/requests`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ chatId: chat.id, payerUsername: selectedRecipient.username, payee: profile.address, amount }) });
     const data = await response.json();
     if (!response.ok) return setNotice(data.error);
+    setRequests((all) => [...all, data]);
     setAmount('');
   }
 
