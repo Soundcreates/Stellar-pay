@@ -152,7 +152,7 @@ export default function App() {
     <main>
       <aside>
         <div className="brand"><span className="mark">✦</span> STELLAR<br /><span>PAY</span></div>
-        <button className="wallet" onClick={connect}>{profile?.username ? `@${profile.username}` : 'Connect wallet'}</button>
+        <div className="identity"><button className="wallet" onClick={connect}>{profile?.username ? `@${profile.username}` : 'Connect wallet'}</button>{profile?.address && <small title={profile.address}>{profile.address}</small>}</div>
         <form className="new-chat" onSubmit={openChat}><label>NEW DIRECT MESSAGE<input value={chatQuery} onChange={(e) => setChatQuery(e.target.value)} placeholder="@username" /></label><button>+</button></form>
         <form className="new-group" onSubmit={createGroup}><label>NEW GROUP<input value={groupTitle} onChange={(e) => setGroupTitle(e.target.value)} placeholder="Weekend trip" /></label><input value={groupUsers} onChange={(e) => setGroupUsers(e.target.value)} placeholder="@alice, @sam" /><button>Create group</button></form>
         {invites.length > 0 && <div className="invites"><small>CHAT REQUESTS</small>{invites.map((invite) => <div key={invite.id}><span>@{invite.username} wants to chat</span><button onClick={() => respondToInvite(invite, true)}>Accept</button><button onClick={() => respondToInvite(invite, false)}>Reject</button></div>)}</div>}
