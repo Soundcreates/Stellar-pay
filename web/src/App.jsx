@@ -6,6 +6,7 @@ const API = 'https://stellar-splitwise.onrender.com';
 
 export default function App() {
   const socket = useRef();
+  const activeChat = useRef(null);
   const [profile, setProfile] = useState(null);
   const [setup, setSetup] = useState(false);
   const [username, setUsername] = useState('');
@@ -24,17 +25,21 @@ export default function App() {
 
   useEffect(() => {
     socket.current = io(API, { transports: ['websocket'], reconnectionAttempts: 3 });
-    socket.current.on('message:new', (message) => setMessages((all) => [...all, message]));
+    socket.current.on('message:new', (message) => activeChat.current?.id === message.chatId && setMessages((all) => [...all, message]));
+    socket.current.on('request:new', (request) => activeChat.current?.id === request.chatId && setRequests((all) => all.some((item) => item.id === request.id) ? all : [...all, request]));
+    socket.current.on('request:updated', (request) => activeChat.current?.id === request.chatId && setRequests((all) => all.map((item) => item.id === request.id ? request : item)));
     return () => socket.current.close();
   }, []);
 
   useEffect(() => {
     setMessages([]);
     setRequests([]);
+    activeChat.current = chat;
     if (!chat) return;
     socket.current?.emit('chat:join', chat.id);
     fetch(`${API}/chats/${chat.id}/messages`).then((r) => r.json()).then(setMessages).catch(() => {});
     fetch(`${API}/chats/${chat.id}/requests`).then((r) => r.json()).then(setRequests).catch(() => {});
+    return () => socket.current?.emit('chat:leave', chat.id);
   }, [chat]);
 
   useEffect(() => {
@@ -122,6 +127,7 @@ export default function App() {
     const result = await fetch(`${API}/payments/submit`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ signedXdr: signed.signedTxXdr, chatId: chat.id }) }).then((r) => r.json());
     if (result.error) throw new Error(JSON.stringify(result.error));
     setNotice(`Confirmed: ${result.hash.slice(0, 10)}…`);
+    return result;
   }
 
   async function directPay(event) {
@@ -140,8 +146,9 @@ export default function App() {
 
   async function payRequest(request) {
     try {
-      await submitPayment(request.payee, request.amount);
-      setRequests((all) => all.map((item) => item.id === request.id ? { ...item, status: 'paid' } : item));
+      const result = await submitPayment(request.payee, request.amount);
+      const updated = await fetch(`${API}/requests/${request.id}/pay`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ payer: profile.address, transactionHash: result.hash }) }).then((response) => response.json());
+      if (updated.error) throw new Error(updated.error);
     } catch (error) { setNotice(error.message); }
   }
 

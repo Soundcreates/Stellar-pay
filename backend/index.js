@@ -112,6 +112,7 @@ app.post('/messages', async (request, reply) => {
     const chatId = requireText(request.body?.chatId, 'chatId');
     const message = {
       id: crypto.randomUUID(),
+      chatId,
       sender: requireText(request.body?.sender, 'sender'),
       text: requireText(request.body?.text, 'text'),
       createdAt: new Date().toISOString(),
@@ -145,10 +146,20 @@ app.post('/requests', async (request, reply) => {
       type: 'request',
     };
     requests.set(payment.id, payment);
+    send(chatId, 'request:new', payment);
     return payment;
   } catch (error) {
     return reply.code(400).send({ error: error.message });
   }
+});
+
+app.post('/requests/:id/pay', async (request, reply) => {
+  const payment = requests.get(request.params.id);
+  if (!payment || payment.payer !== request.body?.payer) return reply.code(404).send({ error: 'payment request not found' });
+  payment.status = 'paid';
+  payment.transactionHash = requireText(request.body?.transactionHash, 'transactionHash');
+  send(payment.chatId, 'request:updated', payment);
+  return payment;
 });
 
 // Builds an unsigned native-XLM transfer. Freighter signs it; this server never receives a secret key.
@@ -186,6 +197,7 @@ app.post('/payments/submit', async (request, reply) => {
 
 io.on('connection', (socket) => {
   socket.on('chat:join', (chatId) => socket.join(chatId));
+  socket.on('chat:leave', (chatId) => socket.leave(chatId));
   socket.on('typing', ({ chatId, sender }) => socket.to(chatId).emit('typing', { sender }));
 });
 
