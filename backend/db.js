@@ -15,6 +15,13 @@ export function createStore(filename = process.env.DATABASE_PATH || 'stellar-pay
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       UNIQUE(member_one, member_two)
     ) STRICT;
+    CREATE TABLE IF NOT EXISTS chat_requests (
+      id TEXT PRIMARY KEY,
+      sender TEXT NOT NULL,
+      receiver TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(sender, receiver)
+    ) STRICT;
     CREATE TABLE IF NOT EXISTS group_chats (
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
@@ -34,6 +41,11 @@ export function createStore(filename = process.env.DATABASE_PATH || 'stellar-pay
   const byMembers = db.prepare('SELECT id, member_one, member_two FROM chats WHERE member_one = ? AND member_two = ?');
   const membersByChat = db.prepare('SELECT member_one, member_two FROM chats WHERE id = ?');
   const insertChat = db.prepare('INSERT INTO chats (id, member_one, member_two) VALUES (?, ?, ?)');
+  const requestByMembers = db.prepare('SELECT id, sender, receiver FROM chat_requests WHERE sender = ? AND receiver = ?');
+  const requestById = db.prepare('SELECT id, sender, receiver FROM chat_requests WHERE id = ?');
+  const insertRequest = db.prepare('INSERT INTO chat_requests (id, sender, receiver) VALUES (?, ?, ?)');
+  const deleteRequest = db.prepare('DELETE FROM chat_requests WHERE id = ?');
+  const requestsFor = db.prepare('SELECT chat_requests.id, chat_requests.sender, users.username FROM chat_requests JOIN users ON users.address = chat_requests.sender WHERE chat_requests.receiver = ? ORDER BY chat_requests.created_at DESC');
   const insertGroup = db.prepare('INSERT INTO group_chats (id, title, creator) VALUES (?, ?, ?)');
   const insertMember = db.prepare('INSERT INTO group_members (chat_id, address) VALUES (?, ?)');
   const groupHasMembers = db.prepare('SELECT COUNT(DISTINCT address) AS count FROM group_members WHERE chat_id = ? AND address IN (?, ?)');
@@ -48,6 +60,10 @@ export function createStore(filename = process.env.DATABASE_PATH || 'stellar-pay
       insertUser.run(address, username);
       return byAddress.get(address);
     },
+    existingDirectChat(first, second) {
+      const [memberOne, memberTwo] = [first, second].sort();
+      return byMembers.get(memberOne, memberTwo) || null;
+    },
     directChat(first, second) {
       const [memberOne, memberTwo] = [first, second].sort();
       return byMembers.get(memberOne, memberTwo) || (() => {
@@ -55,6 +71,20 @@ export function createStore(filename = process.env.DATABASE_PATH || 'stellar-pay
         insertChat.run(chat.id, chat.memberOne, chat.memberTwo);
         return chat;
       })();
+    },
+    createChatRequest(sender, receiver) {
+      const existing = requestByMembers.get(sender, receiver);
+      if (existing) return { ...existing, created: false };
+      const invite = { id: crypto.randomUUID(), sender, receiver, created: true };
+      insertRequest.run(invite.id, invite.sender, invite.receiver);
+      return invite;
+    },
+    chatRequestsFor: (address) => requestsFor.all(address),
+    respondToChatRequest(id, receiver, accept) {
+      const invite = requestById.get(id);
+      if (!invite || invite.receiver !== receiver) return null;
+      deleteRequest.run(id);
+      return accept ? { invite, chat: this.directChat(invite.sender, invite.receiver) } : { invite, chat: null };
     },
     chatHasMembers(id, first, second) {
       const chat = membersByChat.get(id);

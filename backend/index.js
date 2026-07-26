@@ -50,6 +50,7 @@ app.get('/users/address/:address', async (request) => store.userByAddress(reques
 app.get('/users/lookup/:username', async (request) => store.userByUsername(username(request.params.username)));
 
 app.get('/chats/user/:address', async (request) => store.chatsFor(request.params.address));
+app.get('/chats/requests/:address', async (request) => store.chatRequestsFor(request.params.address));
 
 app.post('/users', async (request, reply) => {
   try {
@@ -70,10 +71,20 @@ app.post('/chats/direct', async (request, reply) => {
     const peer = store.userByUsername(username(request.body?.username));
     if (!peer) return reply.code(404).send({ error: 'username not found' });
     if (peer.address === address) return reply.code(400).send({ error: 'you cannot message yourself' });
-    return { ...store.directChat(address, peer.address), type: 'direct', peer };
+    const existing = store.existingDirectChat(address, peer.address);
+    if (existing) return { ...existing, type: 'direct', peer };
+    const invite = store.createChatRequest(address, peer.address);
+    return { ...invite, type: 'invite', recipient: peer };
   } catch (error) {
     return reply.code(400).send({ error: error.message });
   }
+});
+
+app.post('/chats/requests/:id', async (request, reply) => {
+  const result = store.respondToChatRequest(request.params.id, request.body?.address, request.body?.accept === true);
+  if (!result) return reply.code(404).send({ error: 'chat request not found' });
+  const peer = store.userByAddress(result.invite.sender);
+  return { accepted: Boolean(result.chat), chat: result.chat && { ...result.chat, type: 'direct', peer } };
 });
 
 app.post('/chats/group', async (request, reply) => {

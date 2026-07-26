@@ -14,6 +14,7 @@ export default function App() {
   const [groupUsers, setGroupUsers] = useState('');
   const [chat, setChat] = useState(null);
   const [chats, setChats] = useState([]);
+  const [invites, setInvites] = useState([]);
   const [recipient, setRecipient] = useState('');
   const [text, setText] = useState('');
   const [amount, setAmount] = useState('');
@@ -45,6 +46,7 @@ export default function App() {
   useEffect(() => {
     if (!profile?.username) return;
     fetch(`${API}/chats/user/${profile.address}`).then((response) => response.json()).then(setChats).catch(() => {});
+    fetch(`${API}/chats/requests/${profile.address}`).then((response) => response.json()).then(setInvites).catch(() => {});
   }, [profile]);
 
   async function connect() {
@@ -75,9 +77,20 @@ export default function App() {
     const response = await fetch(`${API}/chats/direct`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ address: profile.address, username: chatQuery }) });
     const data = await response.json();
     if (!response.ok) return setNotice(data.error);
+    if (data.type === 'invite') return setNotice(data.created ? `Chat request sent to @${data.recipient.username}.` : `Your request to @${data.recipient.username} is pending.`);
     setChat(data);
     setChats((all) => [data, ...all.filter((item) => item.id !== data.id)]);
     setChatQuery('');
+  }
+
+  async function respondToInvite(invite, accept) {
+    const response = await fetch(`${API}/chats/requests/${invite.id}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ address: profile.address, accept }) });
+    const data = await response.json();
+    if (!response.ok) return setNotice(data.error);
+    setInvites((all) => all.filter((item) => item.id !== invite.id));
+    if (!accept) return;
+    setChats((all) => [data.chat, ...all.filter((item) => item.id !== data.chat.id)]);
+    setChat(data.chat);
   }
 
   async function createGroup(event) {
@@ -142,6 +155,7 @@ export default function App() {
         <button className="wallet" onClick={connect}>{profile?.username ? `@${profile.username}` : 'Connect wallet'}</button>
         <form className="new-chat" onSubmit={openChat}><label>NEW DIRECT MESSAGE<input value={chatQuery} onChange={(e) => setChatQuery(e.target.value)} placeholder="@username" /></label><button>+</button></form>
         <form className="new-group" onSubmit={createGroup}><label>NEW GROUP<input value={groupTitle} onChange={(e) => setGroupTitle(e.target.value)} placeholder="Weekend trip" /></label><input value={groupUsers} onChange={(e) => setGroupUsers(e.target.value)} placeholder="@alice, @sam" /><button>Create group</button></form>
+        {invites.length > 0 && <div className="invites"><small>CHAT REQUESTS</small>{invites.map((invite) => <div key={invite.id}><span>@{invite.username} wants to chat</span><button onClick={() => respondToInvite(invite, true)}>Accept</button><button onClick={() => respondToInvite(invite, false)}>Reject</button></div>)}</div>}
         <p>TESTNET · Native XLM</p>
         <nav><small>CHATS</small>{chats.length ? chats.map((item) => <button className={item.id === chat?.id ? 'chat-item active' : 'chat-item'} key={item.id} onClick={() => setChat(item)}>{item.type === 'group' ? item.title : `@${item.peer.username}`}</button>) : <span>No chats yet</span>}</nav>
       </aside>
