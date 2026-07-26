@@ -9,5 +9,8 @@ test('usernames are unique and direct chats are reused', () => {
   assert.equal(store.userByUsername('ALICE').address, 'GB');
   const chat = store.directChat('GA', 'GB');
   assert.equal(store.directChat('GB', 'GA').id, chat.id);
+  const group = store.createGroup('Weekend', 'GA', ['GB']);
+  assert.equal(store.chatHasMembers(group.id, 'GA', 'GB'), true);
+  assert.equal(store.chatsFor('GB').length, 2);
   assert.throws(() => store.createUser('GC', 'alice'));
 });

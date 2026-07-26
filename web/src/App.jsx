@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { isConnected, requestAccess, signTransaction } from '@stellar/freighter-api';
 import { io } from 'socket.io-client';
 
-const API = import.meta.env.VITE_API_URL || 'http://localhost:3100';
+const API = import.meta.env.VITE_API_URL || 'https://kisha-volcanologic-motherly.ngrok-free.dev';
 
 export default function App() {
   const socket = useRef();
@@ -10,7 +10,11 @@ export default function App() {
   const [setup, setSetup] = useState(false);
   const [username, setUsername] = useState('');
   const [chatQuery, setChatQuery] = useState('');
+  const [groupTitle, setGroupTitle] = useState('');
+  const [groupUsers, setGroupUsers] = useState('');
   const [chat, setChat] = useState(null);
+  const [chats, setChats] = useState([]);
+  const [recipient, setRecipient] = useState('');
   const [text, setText] = useState('');
   const [amount, setAmount] = useState('');
   const [messages, setMessages] = useState([]);
@@ -18,7 +22,7 @@ export default function App() {
   const [notice, setNotice] = useState('');
 
   useEffect(() => {
-    socket.current = io(API);
+    socket.current = io(API, { transports: ['websocket'], reconnectionAttempts: 3 });
     socket.current.on('message:new', (message) => setMessages((all) => [...all, message]));
     socket.current.on('payment:request', (payment) => setRequests((all) => [...all, payment]));
     socket.current.on('payment:confirmed', ({ hash }) => setNotice(`Confirmed: ${hash.slice(0, 10)}…`));
@@ -32,6 +36,17 @@ export default function App() {
     socket.current?.emit('chat:join', chat.id);
     fetch(`${API}/chats/${chat.id}/messages`).then((r) => r.json()).then(setMessages).catch(() => {});
   }, [chat]);
+
+  useEffect(() => {
+    if (!chat) return;
+    const peers = chat.type === 'group' ? chat.members.filter((member) => member.address !== profile?.address) : [chat.peer];
+    setRecipient(peers[0]?.username || '');
+  }, [chat, profile?.address]);
+
+  useEffect(() => {
+    if (!profile?.username) return;
+    fetch(`${API}/chats/user/${profile.address}`).then((response) => response.json()).then(setChats).catch(() => {});
+  }, [profile]);
 
   async function connect() {
     if (!await isConnected()) return setNotice('Install Freighter to sign Stellar testnet payments.');
@@ -58,7 +73,20 @@ export default function App() {
     const data = await response.json();
     if (!response.ok) return setNotice(data.error);
     setChat(data);
+    setChats((all) => [data, ...all.filter((item) => item.id !== data.id)]);
     setChatQuery('');
+  }
+
+  async function createGroup(event) {
+    event.preventDefault();
+    if (!profile?.username) return setNotice('Connect your wallet and choose a username first.');
+    const response = await fetch(`${API}/chats/group`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ creator: profile.address, title: groupTitle, usernames: groupUsers.split(',').map((name) => name.trim()).filter(Boolean) }) });
+    const data = await response.json();
+    if (!response.ok) return setNotice(data.error);
+    setChat(data);
+    setChats((all) => [data, ...all.filter((item) => item.id !== data.id)]);
+    setGroupTitle('');
+    setGroupUsers('');
   }
 
   async function sendMessage(event) {
@@ -81,12 +109,12 @@ export default function App() {
 
   async function directPay(event) {
     event.preventDefault();
-    try { await submitPayment(chat.peer.address, amount); setAmount(''); }
+    try { await submitPayment(selectedRecipient.address, amount); setAmount(''); }
     catch (error) { setNotice(error.message); }
   }
 
   async function createRequest() {
-    const response = await fetch(`${API}/requests`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ chatId: chat.id, payerUsername: chat.peer.username, payee: profile.address, amount }) });
+    const response = await fetch(`${API}/requests`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ chatId: chat.id, payerUsername: selectedRecipient.username, payee: profile.address, amount }) });
     const data = await response.json();
     if (!response.ok) return setNotice(data.error);
     setAmount('');
@@ -99,26 +127,29 @@ export default function App() {
     } catch (error) { setNotice(error.message); }
   }
 
-  const title = chat ? `@${chat.peer.username}` : 'Your messages';
+  const recipients = chat ? (chat.type === 'group' ? chat.members.filter((member) => member.address !== profile?.address) : [chat.peer]) : [];
+  const selectedRecipient = recipients.find((member) => member.username === recipient) || recipients[0];
+  const title = !chat ? 'Your messages' : chat.type === 'group' ? chat.title : `@${chat.peer.username}`;
   return <>
     <main>
       <aside>
         <div className="brand"><span className="mark">✦</span> STELLAR<br /><span>PAY</span></div>
         <button className="wallet" onClick={connect}>{profile?.username ? `@${profile.username}` : 'Connect wallet'}</button>
         <form className="new-chat" onSubmit={openChat}><label>NEW DIRECT MESSAGE<input value={chatQuery} onChange={(e) => setChatQuery(e.target.value)} placeholder="@username" /></label><button>+</button></form>
+        <form className="new-group" onSubmit={createGroup}><label>NEW GROUP<input value={groupTitle} onChange={(e) => setGroupTitle(e.target.value)} placeholder="Weekend trip" /></label><input value={groupUsers} onChange={(e) => setGroupUsers(e.target.value)} placeholder="@alice, @sam" /><button>Create group</button></form>
         <p>TESTNET · Native XLM</p>
-        <nav><small>CHATS</small><b>{chat ? title : 'No chat selected'}</b><span>● online now</span></nav>
+        <nav><small>CHATS</small>{chats.length ? chats.map((item) => <button className={item.id === chat?.id ? 'chat-item active' : 'chat-item'} key={item.id} onClick={() => setChat(item)}>{item.type === 'group' ? item.title : `@${item.peer.username}`}</button>) : <span>No chats yet</span>}</nav>
       </aside>
       <section>
-        <header><div><small className="eyebrow">SOCIAL PAYMENTS</small><h1>{title}</h1><small>{chat ? 'Direct message · payments limited to this chat' : 'Search a username to begin'}</small></div><div className="status"><i />Online</div></header>
+        <header><div><small className="eyebrow">SOCIAL PAYMENTS</small><h1>{title}</h1><small>{chat ? `${chat.type === 'group' ? 'Group chat' : 'Direct message'} · payments limited to members` : 'Search a username to begin'}</small></div><div className="status"><i />Online</div></header>
         <div className="thread">
           {!chat && <div className="empty"><span>✦</span><h2>Start a direct message</h2><p>Search an existing @username. Payments are restricted to the person in the chat.</p></div>}
-          {chat && !messages.length && !requests.length && <div className="empty"><span>✦</span><h2>Say hello to {title}</h2><p>Send a message, request XLM, or pay them directly.</p></div>}
+          {chat && !messages.length && !requests.length && <div className="empty"><span>✦</span><h2>Say hello to {title}</h2><p>Send a message, request XLM, or pay a member directly.</p></div>}
           {messages.map((message) => <article className={message.sender === profile?.username ? 'mine' : ''} key={message.id}><small>{message.sender === profile?.username ? 'You' : `@${message.sender}`}</small><p>{message.text}</p></article>)}
           {requests.map((request) => <article className="request" key={request.id}><small>PAYMENT REQUEST</small><strong>{request.amount} XLM</strong><p>{request.payer === profile?.address ? 'Requested from you' : `Requested from @${request.payerUsername}`}</p><button disabled={request.status === 'paid' || request.payer !== profile?.address} onClick={() => payRequest(request)}>{request.status === 'paid' ? 'Paid' : request.payer === profile?.address ? 'Pay now' : 'Waiting for payment'}</button></article>)}
         </div>
         {notice && <div className="notice">{notice}</div>}
-        {chat && <form className="payment-actions" onSubmit={directPay}><label><span>PAY {title.toUpperCase()}</span><input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" placeholder="0.00 XLM" /></label><button>Pay</button><button type="button" onClick={createRequest}>Request</button></form>}
+        {chat && selectedRecipient && <form className="payment-actions" onSubmit={directPay}><label><span>{chat.type === 'group' ? 'GROUP MEMBER' : 'CHAT MEMBER'}</span>{chat.type === 'group' ? <select value={recipient} onChange={(e) => setRecipient(e.target.value)}>{recipients.map((member) => <option key={member.address} value={member.username}>@{member.username}</option>)}</select> : <input readOnly value={`@${selectedRecipient.username}`} />}</label><label><span>AMOUNT</span><input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" placeholder="0.00 XLM" /></label><button>Pay</button><button type="button" onClick={createRequest}>Request</button></form>}
         {chat && <form className="composer" onSubmit={sendMessage}><input value={text} onChange={(e) => setText(e.target.value)} placeholder={`Message ${title}`} /><button aria-label="Send message">↑</button></form>}
       </section>
     </main>

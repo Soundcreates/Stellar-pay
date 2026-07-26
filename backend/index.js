@@ -13,14 +13,14 @@ import {
 } from '@stellar/stellar-sdk';
 
 const app = Fastify({ logger: true });
-const webOrigin = process.env.WEB_ORIGIN || 'http://localhost:5173';
-const io = new SocketServer(app.server, { cors: { origin: webOrigin } });
+const corsOptions = { origin: ['http://localhost:5173', 'https://stellar-splitwise-web.vercel.app'] };
+const io = new SocketServer(app.server, { cors: corsOptions });
 const horizon = new Horizon.Server(process.env.STELLAR_HORIZON_URL || 'https://horizon-testnet.stellar.org');
 const store = createStore();
 const messages = new Map();
 const requests = new Map();
 
-await app.register(cors, { origin: webOrigin });
+await app.register(cors, corsOptions);
 
 function requireText(value, name) {
   if (typeof value !== 'string' || !value.trim()) throw new Error(`${name} is required`);
@@ -49,6 +49,8 @@ app.get('/users/address/:address', async (request) => store.userByAddress(reques
 
 app.get('/users/lookup/:username', async (request) => store.userByUsername(username(request.params.username)));
 
+app.get('/chats/user/:address', async (request) => store.chatsFor(request.params.address));
+
 app.post('/users', async (request, reply) => {
   try {
     const address = requireText(request.body?.address, 'address');
@@ -68,7 +70,24 @@ app.post('/chats/direct', async (request, reply) => {
     const peer = store.userByUsername(username(request.body?.username));
     if (!peer) return reply.code(404).send({ error: 'username not found' });
     if (peer.address === address) return reply.code(400).send({ error: 'you cannot message yourself' });
-    return { ...store.directChat(address, peer.address), peer };
+    return { ...store.directChat(address, peer.address), type: 'direct', peer };
+  } catch (error) {
+    return reply.code(400).send({ error: error.message });
+  }
+});
+
+app.post('/chats/group', async (request, reply) => {
+  try {
+    const creator = requireText(request.body?.creator, 'creator');
+    if (!store.userByAddress(creator)) return reply.code(403).send({ error: 'create a username before starting chats' });
+    const title = requireText(request.body?.title, 'group name').slice(0, 40);
+    const names = [...new Set((request.body?.usernames || []).map(username))];
+    if (!names.length) return reply.code(400).send({ error: 'add at least one username' });
+    const members = names.map((name) => store.userByUsername(name));
+    if (members.some((member) => !member)) return reply.code(404).send({ error: 'one or more usernames were not found' });
+    if (!members.some((member) => member.address !== creator)) return reply.code(400).send({ error: 'add at least one other person' });
+    const group = store.createGroup(title, creator, members.map((member) => member.address));
+    return { ...group, type: 'group', members: store.groupMembers(group.id) };
   } catch (error) {
     return reply.code(400).send({ error: error.message });
   }
