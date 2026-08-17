@@ -13,6 +13,8 @@ export default function App() {
   const [chatQuery, setChatQuery] = useState('');
   const [groupTitle, setGroupTitle] = useState('');
   const [groupUsers, setGroupUsers] = useState('');
+  const [expenseTitle, setExpenseTitle] = useState('');
+  const [expenseTotal, setExpenseTotal] = useState('');
   const [chat, setChat] = useState(null);
   const [chats, setChats] = useState([]);
   const [invites, setInvites] = useState([]);
@@ -21,6 +23,7 @@ export default function App() {
   const [amount, setAmount] = useState('');
   const [messages, setMessages] = useState([]);
   const [requests, setRequests] = useState([]);
+  const [expenses, setExpenses] = useState([]);
   const [notice, setNotice] = useState('');
 
   useEffect(() => {
@@ -28,17 +31,21 @@ export default function App() {
     socket.current.on('message:new', (message) => activeChat.current?.id === message.chatId && setMessages((all) => [...all, message]));
     socket.current.on('request:new', (request) => activeChat.current?.id === request.chatId && setRequests((all) => all.some((item) => item.id === request.id) ? all : [...all, request]));
     socket.current.on('request:updated', (request) => activeChat.current?.id === request.chatId && setRequests((all) => all.map((item) => item.id === request.id ? request : item)));
+    socket.current.on('expense:new', (expense) => activeChat.current?.id === expense.chatId && setExpenses((all) => all.some((item) => item.id === expense.id) ? all : [expense, ...all]));
+    socket.current.on('expense:updated', (expense) => activeChat.current?.id === expense.chatId && setExpenses((all) => expense.settled ? all.filter((item) => item.id !== expense.id) : all.map((item) => item.id === expense.id ? expense : item)));
     return () => socket.current.close();
   }, []);
 
   useEffect(() => {
     setMessages([]);
     setRequests([]);
+    setExpenses([]);
     activeChat.current = chat;
     if (!chat) return;
     socket.current?.emit('chat:join', chat.id);
     fetch(`${API}/chats/${chat.id}/messages`).then((r) => r.json()).then(setMessages).catch(() => {});
     fetch(`${API}/chats/${chat.id}/requests`).then((r) => r.json()).then(setRequests).catch(() => {});
+    fetch(`${API}/chats/${chat.id}/expenses`).then((r) => r.json()).then(setExpenses).catch(() => {});
     return () => socket.current?.emit('chat:leave', chat.id);
   }, [chat]);
 
@@ -56,7 +63,11 @@ export default function App() {
 
   async function connect() {
     try {
-      if (!await isConnected()) return setNotice('Install Freighter to sign Stellar testnet payments.');
+      const freighterConnected = await Promise.race([
+        isConnected(),
+        new Promise((resolve) => setTimeout(() => resolve(false), 1500)),
+      ]);
+      if (!freighterConnected) return setNotice('Install Freighter to sign Stellar testnet payments.');
       const { address, error } = await requestAccess();
       if (error) return setNotice(error);
       const user = await fetch(`${API}/users/address/${address}`).then((r) => r.json());
@@ -144,6 +155,24 @@ export default function App() {
     setAmount('');
   }
 
+  async function createExpense(event) {
+    event.preventDefault();
+    const response = await fetch(`${API}/expenses`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ chatId: chat.id, creator: profile.address, title: expenseTitle, total: expenseTotal }) });
+    const data = await response.json();
+    if (!response.ok) return setNotice(data.error);
+    setExpenses((all) => all.some((item) => item.id === data.id) ? all : [data, ...all]);
+    setExpenseTitle('');
+    setExpenseTotal('');
+  }
+
+  async function payExpense(expense, participant) {
+    try {
+      const result = await submitPayment(expense.creator, participant.amount);
+      const updated = await fetch(`${API}/expenses/${expense.id}/pay`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ payer: profile.address, transactionHash: result.hash }) }).then((response) => response.json());
+      if (updated.error) throw new Error(updated.error);
+    } catch (error) { setNotice(error.message); }
+  }
+
   async function payRequest(request) {
     try {
       const result = await submitPayment(request.payee, request.amount);
@@ -170,11 +199,13 @@ export default function App() {
         <header><div><small className="eyebrow">SOCIAL PAYMENTS</small><h1>{title}</h1><small>{chat ? `${chat.type === 'group' ? 'Group chat' : 'Direct message'} · payments limited to members` : 'Search a username to begin'}</small></div><div className="status"><i />Online</div></header>
         <div className="thread">
           {!chat && <div className="empty"><span>✦</span><h2>Start a direct message</h2><p>Search an existing @username. Payments are restricted to the person in the chat.</p></div>}
-          {chat && !messages.length && !requests.length && <div className="empty"><span>✦</span><h2>Say hello to {title}</h2><p>Send a message, request XLM, or pay a member directly.</p></div>}
-          {messages.map((message) => <article className={message.sender === profile?.username ? 'mine' : ''} key={message.id}><small>{message.sender === profile?.username ? 'You' : `@${message.sender}`}</small><p>{message.text}</p></article>)}
+          {chat && !messages.length && !requests.length && !expenses.length && <div className="empty"><span>✦</span><h2>Say hello to {title}</h2><p>Send a message, request XLM, or pay a member directly.</p></div>}
+          {expenses.map((expense) => <article className="expense" key={expense.id}><small>PINNED OUTING · {expense.totalAmount} XLM</small><h2>{expense.title}</h2><p>Split across {expense.participants.length} members. The creator is marked covered.</p>{expense.participants.map((participant) => <div className="expense-member" key={participant.address}><span>@{participant.username} · {participant.amount} XLM</span>{participant.paid ? <b>{participant.address === expense.creator ? 'Covered' : 'Paid'}</b> : participant.address === profile?.address ? <button onClick={() => payExpense(expense, participant)}>Pay share</button> : <b>Unpaid</b>}</div>)}</article>)}
+          {messages.map((message) => <article className={`${message.sender === profile?.username ? 'mine ' : ''}${message.type === 'system' ? 'system' : ''}`} key={message.id}><small>{message.type === 'system' ? 'SYSTEM' : message.sender === profile?.username ? 'You' : `@${message.sender}`}</small><p>{message.text}</p></article>)}
           {requests.map((request) => <article className="request" key={request.id}><small>PAYMENT REQUEST</small><strong>{request.amount} XLM</strong><p>{request.payer === profile?.address ? 'Requested from you' : `Requested from @${request.payerUsername}`}</p><button disabled={request.status === 'paid' || request.payer !== profile?.address} onClick={() => payRequest(request)}>{request.status === 'paid' ? 'Paid' : request.payer === profile?.address ? 'Pay now' : 'Waiting for payment'}</button></article>)}
         </div>
         {notice && <div className="notice">{notice}</div>}
+        {chat?.type === 'group' && <form className="expense-form" onSubmit={createExpense}><label><span>CREATE PINNED OUTING</span><input value={expenseTitle} onChange={(event) => setExpenseTitle(event.target.value)} placeholder="Dinner, cab, outing…" /></label><label><span>TOTAL XLM</span><input value={expenseTotal} onChange={(event) => setExpenseTotal(event.target.value)} inputMode="decimal" placeholder="0.00" /></label><button>Create outing</button></form>}
         {chat && selectedRecipient && <form className="payment-actions" onSubmit={directPay}><label><span>{chat.type === 'group' ? 'GROUP MEMBER' : 'CHAT MEMBER'}</span>{chat.type === 'group' ? <select value={recipient} onChange={(e) => setRecipient(e.target.value)}>{recipients.map((member) => <option key={member.address} value={member.username}>@{member.username}</option>)}</select> : <input readOnly value={`@${selectedRecipient.username}`} />}</label><label><span>AMOUNT</span><input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" placeholder="0.00 XLM" /></label><button>Pay</button><button type="button" onClick={createRequest}>Request</button></form>}
         {chat && <form className="composer" onSubmit={sendMessage}><input value={text} onChange={(e) => setText(e.target.value)} placeholder={`Message ${title}`} /><button aria-label="Send message">↑</button></form>}
       </section>

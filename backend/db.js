@@ -33,6 +33,22 @@ export function createStore(filename = process.env.DATABASE_PATH || 'stellar-pay
       address TEXT NOT NULL,
       PRIMARY KEY (chat_id, address)
     ) STRICT;
+    CREATE TABLE IF NOT EXISTS expenses (
+      id TEXT PRIMARY KEY,
+      chat_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      creator TEXT NOT NULL,
+      total_amount TEXT NOT NULL,
+      settled INTEGER NOT NULL DEFAULT 0
+    ) STRICT;
+    CREATE TABLE IF NOT EXISTS expense_participants (
+      expense_id TEXT NOT NULL,
+      address TEXT NOT NULL,
+      amount TEXT NOT NULL,
+      paid INTEGER NOT NULL DEFAULT 0,
+      transaction_hash TEXT,
+      PRIMARY KEY (expense_id, address)
+    ) STRICT;
   `);
 
   const byAddress = db.prepare('SELECT address, username FROM users WHERE address = ?');
@@ -52,6 +68,19 @@ export function createStore(filename = process.env.DATABASE_PATH || 'stellar-pay
   const groupMembers = db.prepare('SELECT users.address, users.username FROM group_members JOIN users ON users.address = group_members.address WHERE chat_id = ? ORDER BY users.username');
   const directChatsFor = db.prepare(`SELECT chats.id, users.address, users.username FROM chats JOIN users ON users.address = CASE WHEN chats.member_one = ? THEN chats.member_two ELSE chats.member_one END WHERE chats.member_one = ? OR chats.member_two = ?`);
   const groupChatsFor = db.prepare('SELECT group_chats.id, group_chats.title FROM group_chats JOIN group_members ON group_members.chat_id = group_chats.id WHERE group_members.address = ? ORDER BY group_chats.created_at DESC');
+  const insertExpense = db.prepare('INSERT INTO expenses (id, chat_id, title, creator, total_amount) VALUES (?, ?, ?, ?, ?)');
+  const insertExpenseParticipant = db.prepare('INSERT INTO expense_participants (expense_id, address, amount, paid) VALUES (?, ?, ?, ?)');
+  const expenseById = db.prepare('SELECT id, chat_id AS chatId, title, creator, total_amount AS totalAmount, settled FROM expenses WHERE id = ?');
+  const expensesForChat = db.prepare('SELECT id, chat_id AS chatId, title, creator, total_amount AS totalAmount, settled FROM expenses WHERE chat_id = ? AND settled = 0 ORDER BY rowid DESC');
+  const expenseParticipants = db.prepare('SELECT expense_participants.address, users.username, expense_participants.amount, expense_participants.paid, expense_participants.transaction_hash AS transactionHash FROM expense_participants JOIN users ON users.address = expense_participants.address WHERE expense_participants.expense_id = ? ORDER BY users.username');
+  const expenseParticipant = db.prepare('SELECT paid FROM expense_participants WHERE expense_id = ? AND address = ?');
+  const payExpenseParticipant = db.prepare('UPDATE expense_participants SET paid = 1, transaction_hash = ? WHERE expense_id = ? AND address = ?');
+  const unpaidExpenseParticipants = db.prepare('SELECT COUNT(*) AS count FROM expense_participants WHERE expense_id = ? AND paid = 0');
+  const settleExpense = db.prepare('UPDATE expenses SET settled = 1 WHERE id = ?');
+
+  function withParticipants(expense) {
+    return expense && { ...expense, settled: Boolean(expense.settled), participants: expenseParticipants.all(expense.id).map((participant) => ({ ...participant, paid: Boolean(participant.paid) })) };
+  }
 
   return {
     userByAddress: (address) => byAddress.get(address) || null,
@@ -105,6 +134,28 @@ export function createStore(filename = process.env.DATABASE_PATH || 'stellar-pay
       return group;
     },
     groupMembers: (id) => groupMembers.all(id),
+    createExpense(chatId, title, creator, totalAmount, participants) {
+      const expense = { id: crypto.randomUUID(), chatId, title, creator, totalAmount };
+      db.exec('BEGIN');
+      try {
+        insertExpense.run(expense.id, chatId, title, creator, totalAmount);
+        participants.forEach((participant) => insertExpenseParticipant.run(expense.id, participant.address, participant.amount, participant.address === creator ? 1 : 0));
+        db.exec('COMMIT');
+      } catch (error) {
+        db.exec('ROLLBACK');
+        throw error;
+      }
+      return withParticipants(expenseById.get(expense.id));
+    },
+    expensesForChat: (chatId) => expensesForChat.all(chatId).map(withParticipants),
+    payExpense(id, payer, transactionHash) {
+      const expense = expenseById.get(id);
+      const participant = expenseParticipant.get(id, payer);
+      if (!expense || !participant || participant.paid) return null;
+      payExpenseParticipant.run(transactionHash, id, payer);
+      if (unpaidExpenseParticipants.get(id).count === 0) settleExpense.run(id);
+      return withParticipants(expenseById.get(id));
+    },
     chatsFor(address) {
       return [
         ...directChatsFor.all(address, address, address).map((chat) => ({ id: chat.id, type: 'direct', peer: { address: chat.address, username: chat.username } })),

@@ -11,6 +11,9 @@ test('usernames are unique and direct chats are reused', () => {
   assert.equal(store.directChat('GB', 'GA').id, chat.id);
   const group = store.createGroup('Weekend', 'GA', ['GB']);
   assert.equal(store.chatHasMembers(group.id, 'GA', 'GB'), true);
+  const expense = store.createExpense(group.id, 'Outing', 'GA', '1', [{ address: 'GA', amount: '0.5' }, { address: 'GB', amount: '0.5' }]);
+  assert.equal(expense.participants.find((member) => member.address === 'GA').paid, true);
+  assert.equal(store.payExpense(expense.id, 'GB', 'tx-hash').settled, true);
   assert.equal(store.chatsFor('GB').length, 2);
   store.createUser('GC', 'sam');
   const invite = store.createChatRequest('GC', 'GA');

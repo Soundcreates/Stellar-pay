@@ -6,7 +6,9 @@
     "dev": "node index.js",
     "start": "node index.js",
     "check": "node --check index.js",
-    "test": "node --test db.test.mjs"
+    "test": "node --test helpers.test.mjs db.test.mjs routes.test.mjs",
+    "test:integration": "node --test payments.integration.test.mjs",
+    "test:all": "node --test"
   },
   "dependencies": {
     "@fastify/cors": "^11.0.1",
