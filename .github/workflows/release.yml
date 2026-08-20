@@ -1,0 +1,77 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  android:
+    name: Build Android APK and publish
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Require release secrets
+        env:
+          REOWN_PROJECT_ID: ${{ secrets.REOWN_PROJECT_ID }}
+        run: |
+          if [ -z "$REOWN_PROJECT_ID" ]; then
+            echo "Add repository secret REOWN_PROJECT_ID (Reown Cloud project id)."
+            exit 1
+          fi
+
+      - name: Write Flutter .env asset
+        env:
+          REOWN_PROJECT_ID: ${{ secrets.REOWN_PROJECT_ID }}
+          API_BASE: ${{ secrets.API_BASE }}
+        run: |
+          API_BASE="${API_BASE:-https://stellar-splitwise.onrender.com}"
+          printf 'REOWN_PROJECT_ID=%s\nAPI_BASE=%s\n' "$REOWN_PROJECT_ID" "$API_BASE" > .env
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build release APK
+        env:
+          REOWN_PROJECT_ID: ${{ secrets.REOWN_PROJECT_ID }}
+          API_BASE: ${{ secrets.API_BASE }}
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+          API_BASE="${API_BASE:-https://stellar-splitwise.onrender.com}"
+          flutter build apk --release \
+            --build-name="$VERSION" \
+            --build-number="${GITHUB_RUN_NUMBER}" \
+            --dart-define="REOWN_PROJECT_ID=${REOWN_PROJECT_ID}" \
+            --dart-define="API_BASE=${API_BASE}"
+          mv build/app/outputs/flutter-apk/app-release.apk "stellar-pay-${TAG}.apk"
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        working-directory: .
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            "mobile/stellar-pay-${GITHUB_REF_NAME}.apk" \
+            --title "Stellar Pay ${GITHUB_REF_NAME}" \
+            --generate-notes

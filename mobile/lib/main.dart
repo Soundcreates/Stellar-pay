@@ -8,9 +8,10 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 
+import 'app_config.dart';
 import 'wallet_connect_service.dart';
 
-const apiBase = 'https://stellar-splitwise.onrender.com';
+String get apiBase => AppConfig.apiBase;
 const black = Color(0xff090909);
 const panel = Color(0xff171717);
 const line = Color(0xff3d3d3d);
@@ -18,7 +19,11 @@ const muted = Color(0xffa6a6a6);
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await dotenv.load();
+  try {
+    await dotenv.load(isOptional: true);
+  } catch (_) {
+    // Release builds inject REOWN_PROJECT_ID / API_BASE via --dart-define.
+  }
   runApp(const WalletBootstrap());
 }
 

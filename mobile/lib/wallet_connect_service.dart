@@ -2,8 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:reown_appkit/reown_appkit.dart';
+
+import 'app_config.dart';
 
 /// Buffers wallet callbacks that arrive before Reown has finished starting.
 class WalletDeepLinkRouter {
@@ -32,7 +33,7 @@ class WalletDeepLinkRouter {
 
 /// App-wide EVM wallet state. Stellar identities and XDR signing remain separate.
 class WalletConnectService extends ChangeNotifier {
-  static String get projectId => dotenv.get('REOWN_PROJECT_ID', fallback: '');
+  static String get projectId => AppConfig.reownProjectId;
   static const redirectUri = 'stellarpay://';
 
   static const _methodsChannel = MethodChannel(

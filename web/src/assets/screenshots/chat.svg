@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 880" fill="none">
+  <rect width="420" height="880" fill="#080808"/>
+  <rect x="18" y="18" width="384" height="844" rx="44" fill="#1a1a1a"/>
+  <rect x="26" y="26" width="368" height="828" rx="36" fill="#090909"/>
+  <rect x="168" y="36" width="84" height="22" rx="11" fill="#000000"/>
+  <text x="48" y="78" fill="#ffffff" font-family="Inter, ui-sans-serif, sans-serif" font-size="12" font-weight="600">9:41</text>
+  <text x="318" y="78" fill="#ffffff" font-family="Inter, ui-sans-serif, sans-serif" font-size="11">LTE</text>
+  <path d="M46 108 h18 M46 114 h18 M46 120 h18" stroke="#f7f7f5" stroke-width="2"/>
+  <text x="78" y="116" fill="#ffffff" font-family="Inter, ui-sans-serif, sans-serif" font-size="18" font-weight="800">@maya</text>
+  <text x="78" y="132" fill="#a6a6a6" font-family="Inter, ui-sans-serif, sans-serif" font-size="9" font-weight="700" letter-spacing="0.8">Direct message - members only</text>
+  
+  <text x="348" y="122" fill="#ffffff" font-family="Inter, ui-sans-serif, sans-serif" font-size="9" font-weight="800">ONLINE</text>
+  <circle cx="338" cy="119" r="3" fill="#ffffff"/>
+  <line x1="26" y1="148" x2="394" y2="148" stroke="#3d3d3d"/>
+  <rect x="42" y="168" width="250" height="70" fill="#181818" stroke="#3d3d3d"/>
+  <text x="56" y="188" fill="#a6a6a6" font-family="Inter, ui-sans-serif, sans-serif" font-size="10" font-weight="800" letter-spacing="1.2">@maya</text>
+  <text x="56" y="214" fill="#ffffff" font-family="Inter, ui-sans-serif, sans-serif" font-size="14">Can you send your share?</text>
+  <rect x="128" y="252" width="250" height="70" fill="#292929" stroke="#555555"/>
+  <text x="142" y="272" fill="#c6c6c6" font-family="Inter, ui-sans-serif, sans-serif" font-size="10" font-weight="800" letter-spacing="1.2">YOU</text>
+  <text x="142" y="298" fill="#ffffff" font-family="Inter, ui-sans-serif, sans-serif" font-size="14">Sending 12 XLM now.</text>
+  <rect x="42" y="338" width="336" height="92" fill="#202020" stroke="#666666"/>
+  <text x="56" y="360" fill="#a6a6a6" font-family="Inter, ui-sans-serif, sans-serif" font-size="10" font-weight="800" letter-spacing="1.2">SYSTEM</text>
+  <text x="56" y="388" fill="#ffffff" font-family="Inter, ui-sans-serif, sans-serif" font-size="15">Payment sent: 12 XLM to @maya</text>
+  <text x="56" y="412" fill="#a8f06a" font-family="Inter, ui-sans-serif, sans-serif" font-size="13">Confirmed</text>
+  <rect x="26" y="708" width="368" height="146" fill="#101010"/>
+  <rect x="42" y="722" width="162" height="36" fill="none" stroke="#3d3d3d"/>
+  <text x="54" y="745" fill="#f7f7f5" font-family="Inter, ui-sans-serif, sans-serif" font-size="12" font-weight="700">Pay XLM</text>
+  <rect x="216" y="722" width="162" height="36" fill="none" stroke="#3d3d3d"/>
+  <text x="228" y="745" fill="#f7f7f5" font-family="Inter, ui-sans-serif, sans-serif" font-size="12" font-weight="700">Request XLM</text>
+  <rect x="42" y="770" width="268" height="50" fill="#111111" stroke="#3d3d3d"/>
+  <text x="56" y="800" fill="#777777" font-family="Inter, ui-sans-serif, sans-serif" font-size="13">Message @maya</text>
+  <rect x="320" y="770" width="50" height="50" fill="#f7f7f5"/>
+  <path d="M345 800 l0 -16 l-6 6 m6 -6 l6 6" stroke="#090909" stroke-width="2" fill="none"/>
+</svg>

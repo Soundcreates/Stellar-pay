@@ -1,7 +1,10 @@
 {
   "name": "stellar-social-payments",
   "private": true,
-  "workspaces": ["backend", "web"],
+  "workspaces": [
+    "backend",
+    "web"
+  ],
   "scripts": {
     "dev:api": "npm --workspace backend run dev",
     "dev:web": "npm --workspace web run dev",
