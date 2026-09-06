@@ -325,6 +325,8 @@ export default function LandingPage() {
         </div>
         <a className="button button-primary" href={RELEASE_APK}>Download Stellar Pay <span>↓</span></a>
       </section>
+
+      <section className="feature-section" id="features">
         <div className="feature-heading">
           <div>
             <p className="eyebrow"><span /> BUILT FOR REAL PLANS</p>
