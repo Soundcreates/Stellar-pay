@@ -71,6 +71,7 @@ jobs:
             --dart-define="API_BASE=${API_BASE}" \
             --dart-define="BACKEND_BASE_URL=${BACKEND_BASE_URL}"
           mv build/app/outputs/flutter-apk/app-release.apk "stellar-pay-${TAG}.apk"
+          cp "stellar-pay-${TAG}.apk" stellar-pay.apk
 
       - name: Publish GitHub Release
         env:
@@ -79,5 +80,6 @@ jobs:
         run: |
           gh release create "${GITHUB_REF_NAME}" \
             "mobile/stellar-pay-${GITHUB_REF_NAME}.apk" \
+            "mobile/stellar-pay.apk" \
             --title "Stellar Pay ${GITHUB_REF_NAME}" \
             --generate-notes

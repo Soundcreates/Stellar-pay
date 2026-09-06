@@ -14,6 +14,7 @@ import './marketing.css';
 gsap.registerPlugin(useGSAP, ScrollTrigger);
 
 const RELEASE = 'https://github.com/Soundcreates/Stellar-pay/releases/latest';
+const RELEASE_APK = `${RELEASE}/download/stellar-pay.apk`;
 
 const features = [
   {
@@ -249,11 +250,11 @@ export default function LandingPage() {
           <a href="#why">Why</a>
           <a href="#product">Product</a>
           <a href="#features">Features</a>
-          <a href="#security">Security</a>
+          <a href="#download">Download</a>
         </div>
         <div className="nav-actions">
           <a className="nav-app" href="/app">Open app</a>
-          <a className="button button-small button-primary" href={RELEASE} target="_blank" rel="noreferrer">Download now <span>↗</span></a>
+          <a className="button button-small button-primary" href={RELEASE_APK}>Download now <span>↓</span></a>
         </div>
       </nav>
 
@@ -263,7 +264,7 @@ export default function LandingPage() {
           <h1>Move money at the speed of the <em>conversation.</em></h1>
           <p className="hero-lede">Stellar Pay brings chat, native XLM payments, and shared expenses into one place. Talk it out. Settle it there.</p>
           <div className="hero-actions">
-            <a className="button button-primary" href={RELEASE} target="_blank" rel="noreferrer">Download now <span>↗</span></a>
+            <a className="button button-primary" href={RELEASE_APK}>Download now <span>↓</span></a>
             <a className="text-link" href="#product">See the product <span>↓</span></a>
           </div>
           <div className="hero-note">
@@ -316,7 +317,14 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section className="feature-section" id="features">
+      <section className="download-strip" id="download">
+        <div>
+          <p className="eyebrow"><span /> ANDROID APK</p>
+          <h2>Get the latest build.</h2>
+          <p>Downloads the current GitHub Release package. No store listing — just the APK.</p>
+        </div>
+        <a className="button button-primary" href={RELEASE_APK}>Download Stellar Pay <span>↓</span></a>
+      </section>
         <div className="feature-heading">
           <div>
             <p className="eyebrow"><span /> BUILT FOR REAL PLANS</p>
@@ -377,12 +385,12 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section className="download-section" id="download">
+      <section className="download-section">
         <p className="eyebrow"><span /> READY WHEN YOU ARE</p>
         <h2>Put the payment<br /><em>back in the plan.</em></h2>
-        <p>Get the latest Stellar Pay build from GitHub Releases. Same app. Same dark chrome. Signed by your wallet.</p>
-        <a className="button button-primary" href={RELEASE} target="_blank" rel="noreferrer">Download latest release <span>↗</span></a>
-        <small>Web available · Mobile in development · Stellar testnet</small>
+        <p>Get the latest Stellar Pay Android build from GitHub Releases. Same app. Same dark chrome. Signed by your wallet.</p>
+        <a className="button button-primary" href={RELEASE_APK}>Download latest release <span>↓</span></a>
+        <small>Android APK · Web at /app · Stellar testnet</small>
       </section>
 
       <footer className="marketing-footer">
@@ -392,7 +400,7 @@ export default function LandingPage() {
           <a href="#features">Features</a>
           <a href="#security">Security</a>
           <a href="/app">Open app</a>
-          <a href={RELEASE} target="_blank" rel="noreferrer">Download</a>
+          <a href={RELEASE_APK}>Download</a>
         </div>
         <small>© 2026 Stellar Pay · Testnet MVP</small>
       </footer>
