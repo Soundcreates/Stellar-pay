@@ -7,8 +7,12 @@ class AppConfig {
   static const _apiDefault = 'https://stellar-splitwise.onrender.com';
 
   static String get apiBase {
-    const defined = String.fromEnvironment('API_BASE');
-    if (defined.isNotEmpty) return defined;
+    const backendDefined = String.fromEnvironment('BACKEND_BASE_URL');
+    if (backendDefined.isNotEmpty) return backendDefined;
+    const apiDefined = String.fromEnvironment('API_BASE');
+    if (apiDefined.isNotEmpty) return apiDefined;
+    final fromBackendFile = _env('BACKEND_BASE_URL');
+    if (fromBackendFile.isNotEmpty) return fromBackendFile;
     final fromFile = _env('API_BASE');
     return fromFile.isNotEmpty ? fromFile : _apiDefault;
   }

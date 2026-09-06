@@ -22,7 +22,7 @@ Future<void> main() async {
   try {
     await dotenv.load(isOptional: true);
   } catch (_) {
-    // Release builds inject REOWN_PROJECT_ID / API_BASE via --dart-define.
+    // Release builds inject REOWN_PROJECT_ID / BACKEND_BASE_URL via --dart-define.
   }
   runApp(const WalletBootstrap());
 }

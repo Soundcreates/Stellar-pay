@@ -44,9 +44,12 @@ jobs:
         env:
           REOWN_PROJECT_ID: ${{ secrets.REOWN_PROJECT_ID }}
           API_BASE: ${{ secrets.API_BASE }}
+          BACKEND_BASE_URL: ${{ secrets.BACKEND_BASE_URL }}
         run: |
           API_BASE="${API_BASE:-https://stellar-splitwise.onrender.com}"
-          printf 'REOWN_PROJECT_ID=%s\nAPI_BASE=%s\n' "$REOWN_PROJECT_ID" "$API_BASE" > .env
+          BACKEND_BASE_URL="${BACKEND_BASE_URL:-$API_BASE}"
+          printf 'REOWN_PROJECT_ID=%s\nAPI_BASE=%s\nBACKEND_BASE_URL=%s\n' \
+            "$REOWN_PROJECT_ID" "$API_BASE" "$BACKEND_BASE_URL" > .env
 
       - name: Install dependencies
         run: flutter pub get
@@ -55,15 +58,18 @@ jobs:
         env:
           REOWN_PROJECT_ID: ${{ secrets.REOWN_PROJECT_ID }}
           API_BASE: ${{ secrets.API_BASE }}
+          BACKEND_BASE_URL: ${{ secrets.BACKEND_BASE_URL }}
         run: |
           TAG="${GITHUB_REF_NAME}"
           VERSION="${TAG#v}"
           API_BASE="${API_BASE:-https://stellar-splitwise.onrender.com}"
+          BACKEND_BASE_URL="${BACKEND_BASE_URL:-$API_BASE}"
           flutter build apk --release \
             --build-name="$VERSION" \
             --build-number="${GITHUB_RUN_NUMBER}" \
             --dart-define="REOWN_PROJECT_ID=${REOWN_PROJECT_ID}" \
-            --dart-define="API_BASE=${API_BASE}"
+            --dart-define="API_BASE=${API_BASE}" \
+            --dart-define="BACKEND_BASE_URL=${BACKEND_BASE_URL}"
           mv build/app/outputs/flutter-apk/app-release.apk "stellar-pay-${TAG}.apk"
 
       - name: Publish GitHub Release
